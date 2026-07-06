@@ -1,0 +1,14 @@
+"""
+URL configuration for {{ project_name }} project.
+
+optivedge.urls owns the root URL namespace and composes every installed
+OptivEdge-family app's routes via the plugin registry -- new routes belong in
+the owning domain package's app_meta.py, not here.
+"""
+from django.contrib import admin
+from django.urls import include, path
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('optivedge.urls')),
+]
