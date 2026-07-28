@@ -43,7 +43,8 @@ class ApplicationEnvironmentViewTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Set Client Settings")
+        self.assertContains(response, "Client Settings")
+        self.assertContains(response, "Configure")
         self.assertContains(response, "have not been configured yet")
 
     def test_settings_post_creates_application_environment(self):
