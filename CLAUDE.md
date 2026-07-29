@@ -10,8 +10,9 @@ metadata (`ApplicationEnvironment`) that domain packages — OptivEdgeIntegratio
 collection/normalization/storage), OptivEdgeAssessments (assessment workflows), and any future ones — plug
 into. It is installed as a dependency (`pip install -e .` for local dev, or via git URL) by a separate
 downstream Django project that owns `manage.py`, root settings, root URLs, and the database. This repo has
-no `manage.py` and no Django settings module of its own — Django model/view code here cannot be exercised
-without a configured downstream project.
+no `manage.py` and no *downstream* Django settings module of its own — Django model/view code cannot be
+exercised as part of a real deployment without a configured downstream project. It does have a committed
+`tests/settings.py`, but that exists solely to run this repo's own test suite in isolation (see "Commands").
 
 OptivEdge was extracted out of OptivEdgeIntegrations: that repo's stated purpose is firewall data, but its
 root app had accumulated generic shell code (base.html, menu, plugin registry) and `ApplicationEnvironment`
@@ -50,9 +51,16 @@ import optivedge.templatetags.lucide
 PY
 ```
 
-There is no test runner in this repo and no `tests.py` yet. Django model/view behavior requires a configured
-Django project. Validate from a downstream project (or a throwaway settings module with `optivedge` in
-`INSTALLED_APPS`) using:
+Run this repo's own test suite (`src/optivedge/tests.py`) via the committed `tests/settings.py` — a
+minimal, test-only settings module (not a downstream integration example; see `tests/settings.py`'s
+docstring and `DEPLOYMENT.md` for that):
+
+```bash
+DJANGO_SETTINGS_MODULE=tests.settings python -m django test optivedge
+```
+
+Validating full downstream Django behavior (models, migrations, views, other installed apps) still requires
+a real downstream project:
 
 ```bash
 python manage.py check
