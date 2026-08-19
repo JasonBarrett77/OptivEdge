@@ -171,6 +171,32 @@ For local development against a checked-out copy:
 python -m pip install -e ~/PythonProjects/OptivEdge
 ```
 
+### Co-development with local checkouts of the whole stack
+
+Installing the three packages editable **in one `pip install` command fails** with `ResolutionImpossible`.
+OptivEdgeIntegrations and OptivEdgeAssessments declare their `optivedge` dependency as a GitHub URL, and pip
+treats that as a different distribution from a local editable install of the same package — so requesting
+both in one resolution is a genuine conflict, not a pip bug to work around with flags.
+
+Install in stages instead, outermost dependency first, using `--no-deps` on the packages whose git-URL
+dependencies are already satisfied by an editable:
+
+```bash
+# 1. OptivEdge first, with its real dependencies (this is what installs Django).
+python -m pip install -e ~/PythonProjects/OptivEdge
+
+# 2+3. The domain packages, skipping their declared git-URL dependency on OptivEdge --
+#      the editable from step 1 already satisfies it.
+python -m pip install -e ~/PythonProjects/OptivEdgeIntegrations --no-deps
+python -m pip install -e ~/PythonProjects/OptivEdgeAssessments --no-deps
+
+# 4. The public dependencies that --no-deps skipped.
+python -m pip install requests xmltodict python-docx docxtpl XlsxWriter
+```
+
+`pip list` should then show all three as editable paths into `~/PythonProjects/`, and changes in any `src/`
+tree take effect without reinstalling.
+
 ## Configuring a Downstream Django Project
 
 Create a normal Django project:
@@ -181,7 +207,9 @@ django-admin startproject config .
 
 Edit `config/settings.py`.
 
-Import OptivEdge settings components:
+Import OptivEdge's settings components, plus one apps component per domain package the deployment installs.
+Each package exports exactly one such name; only OptivEdge exports context processors and template libraries,
+because only OptivEdge owns the shell:
 
 ```python
 from optivedge.settings.components import (
@@ -189,6 +217,8 @@ from optivedge.settings.components import (
     OPTIVEDGE_CONTEXT_PROCESSORS,
     OPTIVEDGE_TEMPLATE_LIBRARIES,
 )
+from optivedge_integrations.settings.components import OPTIVEDGE_INTEGRATIONS_APPS
+from assessments.settings.components import OPTIVEDGE_ASSESSMENTS_APPS
 ```
 
 Add OptivEdge apps to `INSTALLED_APPS`, followed by whichever domain packages (OptivEdgeIntegrations,
@@ -208,6 +238,13 @@ INSTALLED_APPS = [
     *OPTIVEDGE_ASSESSMENTS_APPS,
 ]
 ```
+
+This is the order `deployment_template/project_name/settings.py-tpl` generates, and it is the order to keep.
+`INSTALLED_APPS` order decides which app wins a template path collision (first match wins in the
+app-directories loader) — there are currently **no** template-name collisions across the three packages, so
+nothing depends on the order today. Reordering it to let a domain package override a shell template would be
+a silent, action-at-a-distance override; put the override in OptivEdge instead, where it is visible to every
+deployment.
 
 Configure templates:
 
