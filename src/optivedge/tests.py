@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.template import Context, Template
 from django.test import TestCase
 from django.urls import reverse
 
@@ -90,3 +91,47 @@ class ApplicationEnvironmentViewTests(TestCase):
         self.assertEqual(application_environment.client_name, "Example Corporation")
         self.assertEqual(application_environment.client_short_name, "EXCORP")
         self.assertEqual(application_environment.opportunity_number, "OP-7654321")
+
+
+class LucideIconTagTests(TestCase):
+    """The tag accepts **attrs. Before this it applied exactly one of them.
+
+    `{% lucide "x" stroke_width="2.5" %}` parsed, rendered, and did nothing - the worst
+    shape a bug can take in a template tag, since the markup looks correct in review.
+    """
+
+    def _render(self, template_text: str) -> str:
+        return Template("{% load lucide %}" + template_text).render(Context({}))
+
+    def test_class_still_works(self):
+        svg = self._render('{% lucide "triangle-alert" class="h-5 w-5" %}')
+        self.assertIn('class="h-5 w-5"', svg)
+
+    def test_an_arbitrary_attribute_is_applied(self):
+        svg = self._render('{% lucide "triangle-alert" stroke_width="2.5" %}')
+        self.assertIn('stroke-width="2.5"', svg)
+
+    def test_underscores_become_hyphens(self):
+        """Django parses tag keywords as identifiers, so stroke-width= cannot be written."""
+        svg = self._render('{% lucide "triangle-alert" stroke_linecap="square" %}')
+        self.assertIn('stroke-linecap="square"', svg)
+        self.assertNotIn("stroke_linecap", svg)
+
+    def test_an_existing_attribute_is_replaced_not_duplicated(self):
+        """Lucide icons ship with stroke-width="2". Two of one attribute is invalid markup
+        whose winner is parser-defined, so an override has to substitute."""
+        svg = self._render('{% lucide "triangle-alert" stroke_width="2.5" %}')
+        self.assertEqual(svg.count("stroke-width"), 1)
+        self.assertNotIn('stroke-width="2"', svg)
+
+    def test_the_health_indicator_renders_thick_and_red(self):
+        """The indicator's absence is what reads as all-clear, so its presence must not
+        look like decoration. Rendering it here pins the styling against a silent revert."""
+        from django.template.loader import render_to_string
+
+        html = render_to_string("base.html", {"app_health_indicators": [
+            {"label": "Normalization is incomplete", "url": "/integrations/normalization-issues/"},
+        ]})
+        self.assertIn("text-red-600", html)
+        self.assertIn('stroke-width="2.5"', html)
+        self.assertIn('class="h-5 w-5"', html)

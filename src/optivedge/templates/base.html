@@ -55,9 +55,12 @@
                         {% if indicator.url %}href="{{ indicator.url }}"{% endif %}
                         title="{{ indicator.label }}"
                         aria-label="{{ indicator.label }}"
-                        class="inline-flex h-7 w-7 items-center justify-center rounded text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50 hover:text-red-700"
                     >
-                        {% lucide "triangle-alert" class="h-4 w-4" %}
+                        {# Red, larger and heavier than a normal icon on purpose: this is the #}
+                        {# only signal that normalization is incomplete, and its ABSENCE is #}
+                        {# what reads as all-clear. It must not look like decoration. #}
+                        {% lucide "triangle-alert" class="h-5 w-5" stroke_width="2.5" %}
                     </a>
                     {% endfor %}
                     {% block header_actions %}{% endblock %}
