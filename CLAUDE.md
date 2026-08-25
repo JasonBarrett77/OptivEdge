@@ -78,8 +78,17 @@ python manage.py runserver
   `ApplicationEnvironment` (client/engagement metadata) with its view/form/routes (`home`,
   `application_environment_settings`).
 - `optivedge.app_registry` provides the plugin convention every domain app uses: any installed app may
-  expose an `app_meta.py` with `URL_MOUNT = {"prefix": ..., "module": ...}` and/or `SIDEBAR_SECTION`, picked
-  up automatically via `optional_app_urlpatterns()` / `sidebar_sections()`. `optivedge.urls` owns the root
+  expose an `app_meta.py` with `URL_MOUNT = {"prefix": ..., "module": ...}`, `SIDEBAR_SECTION`, and/or
+  `HEALTH_INDICATOR = {"check": "module.path:callable"}`, picked up automatically via
+  `optional_app_urlpatterns()` / `sidebar_sections()` / `health_indicators()`.
+
+  A health check takes no arguments and returns **None when everything is fine**, or `{"label", "url"}`.
+  Returning None when healthy is the contract, not an optimisation: the shell then renders nothing, so the
+  indicator's *presence* is the signal. There is deliberately **no count** — a number invites a threshold,
+  and no amount of broken data is an acceptable amount. A check that raises is rendered as a failed check
+  rather than swallowed, because an indicator that fails silently is worse than none: its absence would read
+  as "all clear". `base.html` renders these in the header on every page, outside `{% block header_actions %}`
+  so a page overriding that block cannot hide them. `optivedge.urls` owns the root
   URL namespace (`home` at `/`, `application_environment_settings` at `/environment/settings/`) and appends
   `optional_app_urlpatterns()` — domain apps should never try to own root themselves.
 - `optivedge.views.RightOverlayMixin` and the `TEXT_INPUT_CLASS`/`MONO_TEXT_INPUT_CLASS`/`TEXTAREA_CLASS`
