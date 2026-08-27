@@ -42,6 +42,15 @@ source "$OPTIVEDGE_REPO/.venv/bin/activate"
 rm -rf "$WHEELS_DIR"
 mkdir -p "$WHEELS_DIR"
 
+# setuptools' build/lib is an accumulator: it copies sources in and never removes files
+# that have since been deleted or moved in the source tree. A stale one silently ships
+# both the old and new paths of anything reorganised - measured on OptivEdgeIntegrations,
+# where a docs/ reshuffle produced a wheel carrying 22 files for 14 real ones. Clear it in
+# every repo before building, or the offline bundle inherits the staleness.
+for repo in "$OPTIVEDGE_REPO" "$OPTIVEDGE_INTEGRATIONS_REPO" "$OPTIVEDGE_ASSESSMENTS_REPO"; do
+    rm -rf "$repo/build"
+done
+
 echo "Building wheels for OptivEdge (and its dependencies)..."
 pip wheel "$OPTIVEDGE_REPO" -w "$WHEELS_DIR"
 
