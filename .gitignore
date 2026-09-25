@@ -13,8 +13,8 @@ dist/
 build/
 *.egg-info/
 
-deployment_template/wheels/*.whl
-deployment_template/wheels/*.tar.gz
+src/optivedge/deployment_template/wheels/*.whl
+src/optivedge/deployment_template/wheels/*.tar.gz
 
 .pytest_cache/
 .coverage

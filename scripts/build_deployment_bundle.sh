@@ -23,7 +23,8 @@ OPTIVEDGE_REPO="${OPTIVEDGE_REPO:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 OPTIVEDGE_INTEGRATIONS_REPO="${OPTIVEDGE_INTEGRATIONS_REPO:-$(cd "$OPTIVEDGE_REPO/../OptivEdgeIntegrations" && pwd)}"
 OPTIVEDGE_ASSESSMENTS_REPO="${OPTIVEDGE_ASSESSMENTS_REPO:-$(cd "$OPTIVEDGE_REPO/../OptivEdgeAssessments" && pwd)}"
 
-WHEELS_DIR="$OPTIVEDGE_REPO/deployment_template/wheels"
+TEMPLATE_DIR="$OPTIVEDGE_REPO/src/optivedge/deployment_template"
+WHEELS_DIR="$TEMPLATE_DIR/wheels"
 
 echo "OptivEdge repo:             $OPTIVEDGE_REPO"
 echo "OptivEdgeIntegrations repo: $OPTIVEDGE_INTEGRATIONS_REPO"
@@ -61,6 +62,6 @@ echo "Building wheels for OptivEdgeAssessments (and its dependencies)..."
 pip wheel "$OPTIVEDGE_ASSESSMENTS_REPO" -w "$WHEELS_DIR"
 
 echo
-echo "Bundle ready at: $OPTIVEDGE_REPO/deployment_template/"
+echo "Bundle ready at: $TEMPLATE_DIR/"
 echo "Wheels built:"
 ls -1 "$WHEELS_DIR" | grep -v '.gitkeep' | sort

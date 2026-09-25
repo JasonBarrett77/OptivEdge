@@ -32,13 +32,52 @@ one — see "Creating a New Engagement Deployment".
 
 ## Creating a New Engagement Deployment
 
-`deployment_template/` is a `django-admin startproject` template (see
+`src/optivedge/deployment_template/` is a `django-admin startproject` template (see
 [Django's project template docs](https://docs.djangoproject.com/en/6.0/ref/django-admin/#cmdoption-startproject-template))
 that generates a `manage.py`/`settings.py`/`urls.py` already wired for the full OptivEdge stack (OptivEdge +
 OptivEdgeIntegrations + OptivEdgeAssessments), plus a `wheels/` directory that holds every wheel the
 generated project needs — so a new engagement environment can be stood up fully offline.
 
-### Building the bundle (run this on a machine with PyPI/GitHub access)
+**It SHIPS INSIDE the optivedge wheel**, so a machine that has installed the stack already has the template
+and needs no checkout of this repo. It used to live at the repository root, outside `src/`, which meant
+setuptools never packaged it and a new environment had to fetch it from GitHub — awkward, since these repos
+are private.
+
+### Creating a new engagement, online
+
+The target needs GitHub credentials, because the three repositories are private (`gh auth login`, or a PAT
+in a git credential helper).
+
+```bash
+mkdir ~/SomeClient && cd ~/SomeClient
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+
+# 1. The stack. This is also what installs Django, which the next step needs.
+python -m pip install "git+https://github.com/JasonBarrett77/OptivEdgeAssessments.git@main#egg=optivedge-assessments"
+
+# 2. The project, from the template inside the package just installed.
+django-admin startproject someclient . \
+  --template="$(python -c 'import optivedge, pathlib; print(pathlib.Path(optivedge.__file__).parent / "deployment_template")')"
+
+# 3. Database.
+python manage.py migrate
+python manage.py createsuperuser
+
+# 4. Engagement metadata, then the control catalog - in that order.
+python manage.py runserver     # open http://127.0.0.1:8000/ and use "Configure"
+python manage.py apply_controls_catalog --apply
+```
+
+**Install before `startproject`, not after.** `django-admin` does not exist until Django is installed, and
+Django arrives with the packages.
+
+**Apply the catalog after configuring the engagement.** A fresh database holds no controls at all, so every
+assessment page is empty until this runs — and run before the engagement exists it says "the catalog was
+applied but not recorded as current".
+
+### Building the offline bundle (run this on a machine with PyPI/GitHub access)
 
 ```bash
 cd ~/PythonProjects/OptivEdge
@@ -50,30 +89,33 @@ git push                   # OptivEdgeAssessments first -- the build resolves ea
 ./scripts/build_deployment_bundle.sh
 ```
 
-This populates `deployment_template/wheels/` with wheels for OptivEdge, OptivEdgeIntegrations,
+This populates `src/optivedge/deployment_template/wheels/` with wheels for OptivEdge, OptivEdgeIntegrations,
 OptivEdgeAssessments, and every one of their public PyPI dependencies (Django, requests, xmltodict,
-python-docx, docxtpl, XlsxWriter, and their transitive dependencies). At that point `deployment_template/`
-is a single self-contained directory — copy it (or zip it) to the target environment; no further network
-access is required there.
+python-docx, docxtpl, XlsxWriter, and their transitive dependencies). At that point that directory is
+self-contained — copy it (or zip it) to the target environment; no further network access is required there.
 
-### Creating a new engagement (run this on the target environment)
+### Creating a new engagement, offline
+
+Nothing here needs GitHub, a credential, or a checkout — only the copied template directory.
 
 ```bash
+mkdir ~/SomeClient && cd ~/SomeClient
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 
-django-admin startproject someclientname . --template=/path/to/deployment_template
+# Django first, from the bundled wheels: startproject cannot run without it.
+python -m pip install --no-index --find-links=/path/to/deployment_template/wheels Django
+django-admin startproject someclient . --template=/path/to/deployment_template
+
+# The wheels ride inside the generated project, so this works from the project root.
 python -m pip install --no-index --find-links=wheels optivedge optivedge-integrations optivedge-assessments
 
 python manage.py migrate
 python manage.py createsuperuser
-python manage.py runserver
+python manage.py runserver     # Configure the engagement
+python manage.py apply_controls_catalog --apply
 ```
-
-Open `http://127.0.0.1:8000/`, then use "Configure" on the dashboard to set the client name, short name, and
-opportunity number for this engagement — the same `ApplicationEnvironment` settings screen every OptivEdge
-deployment shares.
 
 ### Template maintenance notes
 
@@ -83,7 +125,7 @@ deployment shares.
 * The `project_name/` directory itself gets renamed to the actual project name — this is Django's own
   `startproject` convention, not something specific to this template.
 * If a new domain package is added to the stack in the future, add its `OPTIVEDGE_<NAME>_APPS` import/splice
-  to `deployment_template/project_name/settings.py-tpl` and its wheel to
+  to `src/optivedge/deployment_template/project_name/settings.py-tpl` and its wheel to
   `scripts/build_deployment_bundle.sh`.
 
 ## Package Layout
@@ -111,14 +153,14 @@ OptivEdge/
 │       │   └── components.py
 │       ├── templates/
 │       └── templatetags/
-├── deployment_template/
-│   ├── manage.py-tpl
-│   ├── wheels/
-│   └── project_name/
-│       ├── settings.py-tpl
-│       ├── urls.py-tpl
-│       ├── wsgi.py-tpl
-│       └── asgi.py-tpl
+│       ├── deployment_template/      <- shipped in the wheel
+│       │   ├── manage.py-tpl
+│       │   ├── wheels/
+│       │   └── project_name/
+│       │       ├── settings.py-tpl
+│       │       ├── urls.py-tpl
+│       │       ├── wsgi.py-tpl
+│       │       └── asgi.py-tpl
 ├── scripts/
 │   └── build_deployment_bundle.sh
 └── .gitignore
@@ -239,7 +281,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-This is the order `deployment_template/project_name/settings.py-tpl` generates, and it is the order to keep.
+This is the order `src/optivedge/deployment_template/project_name/settings.py-tpl` generates, and it is the order to keep.
 `INSTALLED_APPS` order decides which app wins a template path collision (first match wins in the
 app-directories loader) — there are currently **no** template-name collisions across the three packages, so
 nothing depends on the order today. Reordering it to let a domain package override a shell template would be

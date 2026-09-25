@@ -135,3 +135,57 @@ class LucideIconTagTests(TestCase):
         self.assertIn("text-red-600", html)
         self.assertIn('stroke-width="2.5"', html)
         self.assertIn('class="h-5 w-5"', html)
+
+
+class DeploymentTemplateTests(TestCase):
+    """The engagement project template ships inside the wheel.
+
+    It lived at the repository ROOT until 2026-09-25, outside `src/`, so setuptools packaged
+    none of it: an installed optivedge did not carry the thing that generates a project
+    around it, and a new environment had to fetch it from GitHub. These repositories are
+    private, so that meant credentials on every machine that wanted to stand one up.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        import pathlib
+
+        import optivedge
+
+        cls.package = pathlib.Path(optivedge.__file__).resolve().parent
+        cls.template = cls.package / "deployment_template"
+        cls.pyproject = cls.package.parents[1] / "pyproject.toml"
+
+    def test_the_template_lives_inside_the_package(self):
+        """`django-admin startproject --template=<this>` has to work from an INSTALLED
+        optivedge, which means the path is relative to the module, not to a checkout."""
+        self.assertTrue(self.template.is_dir(), self.template)
+
+    def test_it_holds_everything_startproject_needs(self):
+        for name in (
+            "manage.py-tpl",
+            "project_name/settings.py-tpl",
+            "project_name/urls.py-tpl",
+            "project_name/wsgi.py-tpl",
+            "project_name/asgi.py-tpl",
+            "project_name/__init__.py-tpl",
+        ):
+            self.assertTrue((self.template / name).is_file(), name)
+
+    def test_the_generated_settings_wire_all_three_packages(self):
+        settings = (self.template / "project_name" / "settings.py-tpl").read_text(encoding="utf-8")
+
+        for component in ("OPTIVEDGE_APPS", "OPTIVEDGE_INTEGRATIONS_APPS", "OPTIVEDGE_ASSESSMENTS_APPS"):
+            self.assertIn(component, settings)
+
+    def test_package_data_names_the_tpl_suffix(self):
+        """A `*.py` glob matches NO file in the template - every one ends `-tpl` - so the
+        declaration has to say so. Getting this wrong ships an empty directory.
+        """
+        if not self.pyproject.is_file():
+            self.skipTest("installed without the source tree")
+        declared = self.pyproject.read_text(encoding="utf-8")
+
+        self.assertIn('"deployment_template/*-tpl"', declared)
+        self.assertIn('"deployment_template/**/*-tpl"', declared)

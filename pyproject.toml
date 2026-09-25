@@ -19,4 +19,13 @@ where = ["src"]
     "templates/**/*.html",
     "templates/**/*.svg",
     "static/**/*",
+    # The engagement project template, so `django-admin startproject --template` works from
+    # an INSTALLED optivedge and a new environment needs no checkout of this repo. The
+    # `-tpl` suffix has to be named explicitly: nothing includes it by default, and a glob
+    # of `*.py` would miss every file in here.
+    "deployment_template/*-tpl",
+    "deployment_template/**/*-tpl",
+    # Django's startproject copies whatever the template directory holds, so the marker that
+    # gives a generated project its empty `wheels/` directory has to travel with it.
+    "deployment_template/wheels/.gitkeep",
 ]

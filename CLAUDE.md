@@ -25,10 +25,16 @@ troubleshooting) live in `DEPLOYMENT.md`. Read it before changing anything that 
 projects or domain packages consume this package (app label, settings components, URL composition, template
 locations).
 
-This repo also owns `deployment_template/` — a `django-admin startproject --template=` project template
-(not a Python package, not installed by anything) that generates a fully-wired new engagement host project,
-and `scripts/build_deployment_bundle.sh`, which builds wheels for all three OptivEdge-family packages plus
-their public dependencies into `deployment_template/wheels/` for offline installs. See "Creating a New
+This repo also owns `src/optivedge/deployment_template/` — a `django-admin startproject --template=`
+project template that generates a fully-wired new engagement host project, and
+`scripts/build_deployment_bundle.sh`, which builds wheels for all three OptivEdge-family packages plus their
+public dependencies into that template's `wheels/` for offline installs.
+
+**The template is package data and SHIPS IN THE WHEEL**, declared in `pyproject.toml` under
+`package-data`. It sat at the repository root until 2026-09-25, outside `src/`, so setuptools packaged none
+of it and a new environment had to fetch it from GitHub — which these private repositories make awkward.
+The globs name the `-tpl` suffix explicitly: nothing includes it by default, and a `*.py` glob matches no
+file in there. See "Creating a New
 Engagement Deployment" in `DEPLOYMENT.md` for the full workflow. If a new domain package is added to the
 stack, both files need a matching update (see "Template maintenance notes" in `DEPLOYMENT.md`).
 
