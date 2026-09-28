@@ -1,8 +1,12 @@
+from types import SimpleNamespace
+from unittest import mock
+
 from django.core.exceptions import ValidationError
 from django.template import Context, Template
-from django.test import TestCase
-from django.urls import reverse
+from django.test import RequestFactory, TestCase
+from django.urls import ResolverMatch, reverse
 
+from optivedge.app_registry import sidebar_sections
 from optivedge.models import ApplicationEnvironment
 
 
@@ -189,3 +193,113 @@ class DeploymentTemplateTests(TestCase):
 
         self.assertIn('"deployment_template/*-tpl"', declared)
         self.assertIn('"deployment_template/**/*-tpl"', declared)
+
+
+class SidebarSectionTests(TestCase):
+    """How separately-installed apps compose ONE rail.
+
+    Two properties, both of which exist so an app never has to name another app's routes:
+    sections sharing a label become one heading, and `order` decides where that heading lands
+    regardless of which app happened to be installed first.
+    """
+
+    def sections(self, *metas):
+        with mock.patch("optivedge.app_registry.iter_app_meta", return_value=list(metas)):
+            return sidebar_sections()
+
+    def meta(self, section):
+        return SimpleNamespace(SIDEBAR_SECTION=section)
+
+    def test_sections_sharing_a_label_become_one_heading(self):
+        """Notes lives in Integrations and Experimental is named by Assessments. Without this,
+        the rail shows the heading twice."""
+        sections = self.sections(
+            self.meta([{"label": "Experimental", "items": [{"label": "Notes"}]}]),
+            self.meta([{"label": "Experimental", "items": [{"label": "Plain-Language Query"}]}]))
+
+        self.assertEqual(len(sections), 1)
+        self.assertEqual([item["label"] for item in sections[0]["items"]],
+                         ["Notes", "Plain-Language Query"])
+
+    def test_order_decides_where_a_merged_section_lands(self):
+        """The first contributor would otherwise decide it. Integrations is installed before
+        Assessments, so Experimental would sit above the Assessments items."""
+        sections = self.sections(
+            self.meta([{"label": "Experimental", "order": 100, "items": []},
+                       {"label": "Firewall Integrations", "items": []}]),
+            self.meta([{"label": "Assessments", "items": []}]))
+
+        self.assertEqual([section["label"] for section in sections],
+                         ["Firewall Integrations", "Assessments", "Experimental"])
+
+    def test_one_contributor_is_enough_to_make_a_section_collapsible(self):
+        sections = self.sections(
+            self.meta([{"label": "Experimental", "items": []}]),
+            self.meta([{"label": "Experimental", "collapsible": True, "items": []}]))
+
+        self.assertTrue(sections[0]["collapsible"])
+
+    def test_a_section_knows_the_url_names_of_its_own_items(self):
+        """A collapsible section opens on a page inside it, so it needs its items' names.
+        Asking every contributor to repeat them at the section level is a list that falls
+        behind - this one cannot."""
+        sections = self.sections(self.meta([{
+            "label": "Experimental",
+            "active_names": {"declared_by_the_section"},
+            "items": [{"label": "Notes", "active_names": {"note_list", "note_create"}}],
+        }]))
+
+        self.assertEqual(sections[0]["active_names"],
+                         {"declared_by_the_section", "note_list", "note_create"})
+
+    def test_merging_does_not_grow_an_app_meta_on_every_call(self):
+        """The dicts are module-level in each `app_meta`. Appending to one rather than to a
+        copy would add an item to the rail on every request."""
+        declared = {"label": "Experimental", "items": [{"label": "Notes"}]}
+        metas = [self.meta([declared]),
+                 self.meta([{"label": "Experimental", "items": [{"label": "Other"}]}])]
+
+        for _ in range(3):
+            self.assertEqual(len(self.sections(*metas)[0]["items"]), 2)
+        self.assertEqual(len(declared["items"]), 1)
+
+
+class CollapsibleSidebarRenderingTests(TestCase):
+    """`<details>` rather than a button and a class: no JavaScript, and no second source of
+    truth about whether the section is open."""
+
+    template = Template("{% extends 'base.html' %}")
+
+    def render(self, section, url_name):
+        request = RequestFactory().get("/")
+        request.resolver_match = ResolverMatch(lambda r: None, (), {}, url_name=url_name)
+        return self.template.render(Context({
+            "optional_sidebar_sections": [section], "request": request}))
+
+    def section(self, **overrides):
+        return {"label": "Experimental", "collapsible": True,
+                "active_names": {"note_list"},
+                "items": [{"label": "Notes", "href": "/integrations/notes/", "icon": "book-marked",
+                           "active_names": {"note_list"}}],
+                **overrides}
+
+    def test_a_collapsible_section_is_closed_on_an_unrelated_page(self):
+        html = self.render(self.section(), url_name="home")
+
+        self.assertIn("<details", html)
+        self.assertNotIn(" open>", html)
+        # Closed, not absent: the items are in the markup and the browser hides them.
+        self.assertIn("/integrations/notes/", html)
+
+    def test_it_opens_on_a_page_inside_it(self):
+        """Otherwise arriving at a page in a collapsed section shows a rail with no sign of
+        where you are."""
+        html = self.render(self.section(), url_name="note_list")
+
+        self.assertIn(" open>", html)
+
+    def test_a_plain_section_is_not_a_details(self):
+        html = self.render(self.section(collapsible=False), url_name="home")
+
+        self.assertNotIn("<details", html)
+        self.assertIn("/integrations/notes/", html)

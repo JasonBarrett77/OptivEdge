@@ -30,6 +30,30 @@
                         Dashboard
                     </a>
                     {% for section in optional_sidebar_sections %}
+                    {% if section.collapsible %}
+                    {% comment %}
+                    A collapsible section is a <details>, which needs no JavaScript and cannot
+                    get out of step with itself the way a button and a class would. It opens
+                    when the page being rendered is one of its own, so arriving at a page
+                    inside a collapsed section never shows an empty rail.
+                    {% endcomment %}
+                    <details class="group mt-2 border-t border-slate-200 pt-2"{% if request.resolver_match.url_name in section.active_names %} open{% endif %}>
+                        <summary class="flex cursor-pointer list-none items-center gap-1 px-1 pb-0.5 pt-1 text-sm font-medium text-slate-600 hover:text-slate-900 [&::-webkit-details-marker]:hidden">
+                            {% lucide "chevron-right" class="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-open:rotate-90" %}
+                            {{ section.label }}
+                        </summary>
+                        <div class="flex flex-col gap-1 pt-1">
+                            {% for item in section.items %}
+                            <a
+                                href="{{ item.href }}"
+                                class="inline-flex h-8 items-center gap-2 px-6 text-sm transition-colors duration-300 {% if request.resolver_match.url_name in item.active_names %}bg-blue-200/75 font-medium text-slate-900{% else %}text-slate-600 hover:bg-blue-100/70 hover:text-slate-900{% endif %}"
+                            >
+                                {% if item.icon %}{% lucide item.icon class="h-4 w-4 shrink-0" %}{% endif %}{{ item.label }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% else %}
                     <div class="mt-2 flex flex-col gap-1 border-t border-slate-200 pt-2">
                         <div class="px-1 pb-0.5 pt-1 text-sm font-medium text-slate-600">{{ section.label }}</div>
                         {% for item in section.items %}
@@ -41,6 +65,7 @@
                         </a>
                         {% endfor %}
                     </div>
+                    {% endif %}
                     {% endfor %}
                 </div>
                 {% endblock %}

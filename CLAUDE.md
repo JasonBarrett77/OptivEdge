@@ -88,6 +88,21 @@ python manage.py runserver
   `HEALTH_INDICATOR = {"check": "module.path:callable"}`, picked up automatically via
   `optional_app_urlpatterns()` / `sidebar_sections()` / `health_indicators()`.
 
+  `SIDEBAR_SECTION` entries are **merged by label** and then sorted by `order` (default 0, stable).
+  A section is a heading in one rail, not one app's property: "Experimental" is named by Assessments
+  and holds Notes, which lives in Integrations, and merging is what lets each app declare only its
+  own items and its own URL names rather than one app naming another's routes. `order` exists because
+  merging alone puts a shared section wherever its FIRST contributor sits — Integrations is installed
+  before Assessments, so Experimental would otherwise land above the Assessments items. Contributors
+  to a shared section repeat `collapsible`/`order` rather than relying on each other, since each
+  package has to stand alone; the merge takes `collapsible` if ANY declares it and the highest `order`.
+  A section's `active_names` gains its items', so nothing has to restate them.
+
+  `"collapsible": True` renders the section as a `<details>` — no JavaScript, and no second source of
+  truth about whether it is open. It carries `open` when the page being rendered is one of the
+  section's own, so arriving at a page inside a collapsed section never shows a rail with no sign of
+  where you are. Collapsed hides the items visually; they stay in the markup.
+
   A health check takes no arguments and returns **None when everything is fine**, or `{"label", "url"}`.
   Returning None when healthy is the contract, not an optimisation: the shell then renders nothing, so the
   indicator's *presence* is the signal. There is deliberately **no count** — a number invites a threshold,

@@ -71,12 +71,46 @@ def health_indicators():
 
 
 def sidebar_sections():
-    sections = []
+    """The rail's sections, contributed by installed apps, MERGED BY LABEL and then ordered.
+
+    A section is a heading in one rail, not one app's property. "Experimental" is named by
+    Assessments and holds an item that lives in Integrations, and the reader should see one
+    heading rather than two identical ones stacked. Merging by label is what lets each app keep
+    declaring only its own items and its own URL names - the alternative is one app naming
+    another's routes, which is the boundary this whole convention exists to hold.
+
+    `order` (default 0) exists because merging alone puts a shared section wherever its FIRST
+    contributor sits: Integrations is installed before Assessments, so a merged Experimental
+    would otherwise land above the Assessments items rather than below them. The sort is
+    stable, so a section that does not ask for a position keeps the one it had.
+
+    A section's `active_names` gains its items' - a collapsible section needs to know whether
+    the page being rendered is inside it, and asking every contributor to repeat its items'
+    names at the section level is a list that would fall behind.
+    """
+    merged = {}
     for app_meta in iter_app_meta():
-        section = getattr(app_meta, "SIDEBAR_SECTION", None)
-        if section:
-            if isinstance(section, list):
-                sections.extend(section)
-            else:
-                sections.append(section)
-    return sections
+        declared = getattr(app_meta, "SIDEBAR_SECTION", None)
+        if not declared:
+            continue
+        for section in (declared if isinstance(declared, list) else [declared]):
+            items = list(section.get("items") or ())
+            names = set(section.get("active_names") or ())
+            for item in items:
+                names |= set(item.get("active_names") or ())
+
+            existing = merged.get(section["label"])
+            if existing is None:
+                # Copied, not referenced: these dicts are module-level in each app_meta, and
+                # appending to one would grow the rail on every request.
+                merged[section["label"]] = {
+                    **section, "items": items, "active_names": names,
+                    "collapsible": bool(section.get("collapsible")),
+                    "order": section.get("order", 0),
+                }
+                continue
+            existing["items"].extend(items)
+            existing["active_names"] |= names
+            existing["collapsible"] = existing["collapsible"] or bool(section.get("collapsible"))
+            existing["order"] = max(existing["order"], section.get("order", 0))
+    return sorted(merged.values(), key=lambda section: section["order"])
