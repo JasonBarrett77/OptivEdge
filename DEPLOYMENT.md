@@ -58,8 +58,8 @@ python -m pip install --upgrade pip
 python -m pip install "git+https://github.com/JasonBarrett77/OptivEdgeAssessments.git@main#egg=optivedge-assessments"
 
 # 2. The project, from the template inside the package just installed.
-django-admin startproject someclient . \
-  --template="$(python -c 'import optivedge, pathlib; print(pathlib.Path(optivedge.__file__).parent / "deployment_template")')"
+OPTIVEDGE=$(python -c "import optivedge; print(optivedge.__path__[0])")
+django-admin startproject someclient . --template="$OPTIVEDGE/deployment_template"
 
 # 3. Database.
 python manage.py migrate
@@ -68,6 +68,19 @@ python manage.py createsuperuser
 # 4. Engagement metadata, then the control catalog - in that order.
 python manage.py runserver     # open http://127.0.0.1:8000/ and use "Configure"
 python manage.py apply_controls_catalog --apply
+```
+
+**Two steps, and nothing quoted inside the Python.** This was one line with a nested
+`python -c '... "deployment_template" ...'` inside `--template="$( )"`, which works in bash and
+breaks everywhere else: PowerShell and `cmd` strip the inner double quotes, Python then sees a
+bare identifier, and the error is `NameError: name 'deployment_template' is not defined` with
+Python 3.11+ underlining the whole name. It reads like a broken install and is a quoting bug.
+The variable holds the package directory, the shell appends the subdirectory, and no quotes
+cross a shell boundary. In PowerShell:
+
+```powershell
+$optivedge = python -c "import optivedge; print(optivedge.__path__[0])"
+django-admin startproject someclient . --template="$optivedge\deployment_template"
 ```
 
 **Install before `startproject`, not after.** `django-admin` does not exist until Django is installed, and
