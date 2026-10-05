@@ -90,6 +90,46 @@ Django arrives with the packages.
 assessment page is empty until this runs — and run before the engagement exists it says "the catalog was
 applied but not recorded as current".
 
+### On Windows, in PowerShell
+
+The engagement procedures above and below are written for bash. A new engagement machine is as
+likely to be Windows as not — one hit this on 2026-10-05 — and three of those lines are POSIX
+only. Substitute, and everything else is identical:
+
+| bash | PowerShell |
+| --- | --- |
+| `python3.12 -m venv .venv` | `py -3.12 -m venv .venv` |
+| `source .venv/bin/activate` | `.venv\Scripts\Activate.ps1` |
+| `OPTIVEDGE=$(python -c "…")` | `$optivedge = python -c "…"` |
+
+Written out, the venv and template steps:
+
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+# ... step 1 as written ...
+$optivedge = python -c "import optivedge; print(optivedge.__path__[0])"
+django-admin startproject someclient . --template="$optivedge\deployment_template"
+```
+
+`python3.12` does not exist on Windows; `py` is the version launcher that ships with the
+python.org installer, and `py -3.12` is how a specific version is selected. Plain `python`
+works too when 3.12 is the only one installed, which is worth not assuming.
+
+**If activation is refused**, the execution policy is blocking the script rather than anything
+being wrong with the venv:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Process scope, so it lasts for that window only and changes nothing for the machine. The
+default `RemoteSigned` already permits a locally generated `Activate.ps1`; a machine set to
+`Restricted` is the one that needs this.
+
+Everything after the venv - `pip`, `django-admin`, `manage.py` - is the same in both shells.
+
 ### Building the offline bundle (run this on a machine with PyPI/GitHub access)
 
 ```bash
