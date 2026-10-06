@@ -82,10 +82,27 @@ WSGI_APPLICATION = '{{ project_name }}.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/{{ docs_version }}/ref/settings/#databases
 
+# SQLite needs these three for an engagement database that one person browses while a long
+# write runs. Without them "Run Findings" raises OperationalError: database is locked - it is
+# 24 write transactions back to back, and the stock settings give a writer an EXCLUSIVE lock
+# that any concurrent reader blocks, with a 5-second patience.
+#
+#   journal_mode=WAL    readers stop blocking the writer. The one that actually fixes it, and
+#                       it is persistent - set once, kept in the file. NOT usable on a network
+#                       share: drop init_command if db.sqlite3 lives on a mapped drive.
+#   transaction_mode    takes the write lock at BEGIN rather than on first write. Two
+#                       connections that both begin as readers and then both try to upgrade
+#                       deadlock, and no timeout resolves that.
+#   timeout             30 seconds to acquire a lock, against the default 5.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'init_command': 'PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;',
+            'transaction_mode': 'IMMEDIATE',
+        },
     }
 }
 
