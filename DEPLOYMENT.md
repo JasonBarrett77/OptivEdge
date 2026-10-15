@@ -180,6 +180,12 @@ python manage.py apply_controls_catalog --apply
 * If a new domain package is added to the stack in the future, add its `OPTIVEDGE_<NAME>_APPS` import/splice
   to `src/optivedge/deployment_template/project_name/settings.py-tpl` and its wheel to
   `scripts/build_deployment_bundle.sh`.
+* A change to the template reaches NEW engagements only. An existing one was generated from the template as
+  it stood, so a setting added since has to be pasted into its `settings.py` by hand. Two have been:
+  * the SQLite `OPTIONS` block (2026-10-06) - WAL, `transaction_mode`, `timeout` - without which a long
+    write such as Run Findings locks every reader out;
+  * `MEDIA_ROOT` (2026-10-14), where Assessments keeps built workbooks. Without it Build Workbook refuses
+    and says why.
 
 ## Package Layout
 

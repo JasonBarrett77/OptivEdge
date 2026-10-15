@@ -143,4 +143,14 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+
+# Generated client deliverables - the assessment workbook, kept until deleted from
+# Assessments > Downloads. Without this, Build Workbook refuses rather than write the file to
+# wherever the server happened to be started.
+#
+# A directory rather than the database, so db.sqlite3 can be copied without the deliverables
+# riding along. Client-sensitive: keep it off anything shared. No MEDIA_URL - the files are
+# downloaded through an assessments view, never served directly.
+MEDIA_ROOT = BASE_DIR / 'media'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
