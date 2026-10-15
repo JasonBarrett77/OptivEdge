@@ -90,7 +90,7 @@ python manage.py runserver
 
   `SIDEBAR_SECTION` entries are **merged by label** and then sorted by `order` (default 0, stable).
   A section is a heading in one rail, not one app's property: "Experimental" is named by Assessments
-  and holds Notes, which lives in Integrations, and merging is what lets each app declare only its
+  and held Notes, which lives in Integrations, until Notes left the menu (2026-10-15), and merging is what lets each app declare only its
   own items and its own URL names rather than one app naming another's routes. `order` exists because
   merging alone puts a shared section wherever its FIRST contributor sits — Integrations is installed
   before Assessments, so Experimental would otherwise land above the Assessments items. Contributors
@@ -116,6 +116,13 @@ python manage.py runserver
   constants in `optivedge.forms` are shared UI primitives used by domain-app views/forms too (e.g.
   OptivEdgeIntegrations' management-station views and form) — keep them generic, don't couple them to
   `ApplicationEnvironment` specifically even though that's the only consumer defined in this repo.
+
+- `optivedge.lifecycle.server_started` is sent ONCE per server process, on the first request a real
+  WSGI/ASGI handler serves. Domain apps subscribe to close work their daemon threads left RUNNING when
+  the previous process died - an engagement runs one server process, so nothing recorded as running at
+  the start of a new one can be. Not `AppConfig.ready()`: that runs in every `manage.py` command,
+  including ones run beside the live server, and would fail its running work. The test client's
+  handler is ignored, so no test depends on making the process's first request.
 
 ### Template resolution across packages
 

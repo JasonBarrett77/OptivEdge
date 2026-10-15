@@ -415,6 +415,14 @@ http://127.0.0.1:8000/
 If the OptivEdge home page renders (with the "Set Client Settings"/"Configure" prompt), the framework
 package, app config, URL config, templates, and migrations are working.
 
+**Run exactly ONE server process per engagement.** `runserver` is one process, and so is any
+WSGI/ASGI server started with a single worker. The domain apps run long work - collections,
+findings runs, workbook builds - on background threads and record it as running. When a server
+process starts, `optivedge.lifecycle.server_started` closes everything still recorded as running,
+because with one process none of it can be. A second process would close the first's live work.
+`manage.py` commands run beside the server are fine: they never serve a request, so they never
+send it.
+
 ## Development Workflow for OptivEdge
 
 When changing OptivEdge itself:

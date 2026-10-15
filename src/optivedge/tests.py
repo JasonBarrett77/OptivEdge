@@ -303,3 +303,54 @@ class CollapsibleSidebarRenderingTests(TestCase):
 
         self.assertNotIn("<details", html)
         self.assertIn("/integrations/notes/", html)
+
+
+class ServerStartedTests(TestCase):
+    """`server_started` fires once per process, on a REAL server's first request only."""
+
+    def setUp(self):
+        from optivedge import lifecycle
+
+        self.lifecycle = lifecycle
+        self.received = []
+        patcher = mock.patch.object(lifecycle, "_sent", False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        def record(**kwargs):
+            self.received.append(kwargs)
+
+        lifecycle.server_started.connect(record, weak=False, dispatch_uid="server-started-test")
+        self.addCleanup(lifecycle.server_started.disconnect, dispatch_uid="server-started-test")
+
+    def test_the_first_server_request_sends_it_once(self):
+        from django.core.handlers.wsgi import WSGIHandler
+        from django.core.signals import request_started
+
+        request_started.send(sender=WSGIHandler, environ={})
+        request_started.send(sender=WSGIHandler, environ={})
+
+        self.assertEqual(len(self.received), 1)
+
+    def test_the_test_client_does_not_send_it(self):
+        """Otherwise whichever test made the process's first request would close the RUNNING
+        rows other tests set up."""
+        self.client.get(reverse("home"))
+
+        self.assertEqual(self.received, [])
+        self.assertFalse(self.lifecycle._sent)
+
+    def test_a_failing_receiver_does_not_fail_the_request(self):
+        from django.core.handlers.wsgi import WSGIHandler
+        from django.core.signals import request_started
+
+        def broken(**kwargs):
+            raise RuntimeError("boom")
+
+        self.lifecycle.server_started.connect(broken, weak=False, dispatch_uid="server-started-broken")
+        self.addCleanup(self.lifecycle.server_started.disconnect,
+                        dispatch_uid="server-started-broken")
+
+        with self.assertLogs("optivedge.lifecycle", level="ERROR"):
+            request_started.send(sender=WSGIHandler, environ={})
+        self.assertEqual(len(self.received), 1)
